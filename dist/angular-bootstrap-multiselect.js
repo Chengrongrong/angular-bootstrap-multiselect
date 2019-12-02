@@ -160,6 +160,13 @@
                         var unselectedIndex = $scope.unselectedOptions.indexOf(item);
                         $scope.unselectedOptions.splice(unselectedIndex, 1);
                         $scope.selectedOptions.push(item);
+                        // type only number, but not input string
+                        if(typeof($scope.selectionLimit) == 'number'){
+                          var _length = $scope.selectedOptions.length;
+                          if($scope.selectionLimit == _length){
+                            $scope.open = false;
+                          } // if
+                        } // if
                     }
                 };
 
