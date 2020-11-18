@@ -30,7 +30,8 @@
                 labels: '=?',
                 classesBtn: '=?',
                 showTooltip: '=?',
-                placeholder: '@?'
+                placeholder: '@?',
+                fetchSearchFilterData: '=?'
             },
             require: 'ngModel',
             templateUrl: 'multiselect.html',
@@ -47,7 +48,11 @@
 
                 $scope.resolvedOptions = [];
                 if (typeof $scope.options !== 'function') {
+                  if(typeof $scope.options == 'undefined'){
+                    $scope.resolvedOptions = []
+                  }else{
                     $scope.resolvedOptions = $scope.options;
+                  }
                 }
 
                 if (typeof $attrs.disabled != 'undefined') {
@@ -91,6 +96,11 @@
                 $scope.toggleDropdown = function () {
                     $scope.open = !$scope.open;
                     $scope.resolvedOptions = $scope.options;
+
+                    if($scope.searchFilter){
+                      $scope.searchFilter = '';
+                    } // if
+
                     updateSelectionLists();
                 };
 
@@ -121,17 +131,27 @@
                     }
                 });
 
+                // Rong add process pre-fill data to display text content
+                function getReturnText(items){
+                  var totalSelected = angular.isDefined(items) ? items.length : 0;
+                  if (totalSelected === 0) {
+                    return $scope.labels && $scope.labels.select ? $scope.labels.select : ($scope.placeholder || 'Select');
+                  } else {
+                    return totalSelected + ' ' + ($scope.labels && $scope.labels.itemsSelected ? $scope.labels.itemsSelected : 'selected');
+                  }
+                }
                 $scope.getButtonText = function () {
                     if ($scope.selectedOptions && $scope.selectedOptions.length === 1) {
-                        return $scope.getDisplay($scope.selectedOptions[0]);
-                    }
-                    if ($scope.selectedOptions && $scope.selectedOptions.length > 1) {
-                        var totalSelected = angular.isDefined($scope.selectedOptions) ? $scope.selectedOptions.length : 0;
-                        if (totalSelected === 0) {
-                            return $scope.labels && $scope.labels.select ? $scope.labels.select : ($scope.placeholder || 'Select');
-                        } else {
-                            return totalSelected + ' ' + ($scope.labels && $scope.labels.itemsSelected ? $scope.labels.itemsSelected : 'selected');
-                        }
+                      return $scope.getDisplay($scope.selectedOptions[0]);
+                    }else if($scope.selectedOptions && $scope.selectedOptions.length == 0 && $ngModelCtrl.$viewValue && $ngModelCtrl.$viewValue.length == 1){
+                      // Rong add process pre-fill data to display text content
+                      return $scope.getDisplay($ngModelCtrl.$viewValue[0]);
+                    } // if
+
+                    if($scope.selectedOptions && $scope.selectedOptions.length > 1){
+                      return getReturnText($scope.selectedOptions)
+                    }else if($ngModelCtrl.$viewValue && $ngModelCtrl.$viewValue.length > 1){ // Rong add process pre-fill data to display text content
+                      return getReturnText($ngModelCtrl.$viewValue)
                     } else {
                         return $scope.labels && $scope.labels.select ? $scope.labels.select : ($scope.placeholder || 'Select');
                     }
@@ -156,10 +176,25 @@
                     if (currentlySelected) {
                         $scope.unselectedOptions.push($scope.selectedOptions[selectedIndex]);
                         $scope.selectedOptions.splice(selectedIndex, 1);
-                    } else if (!currentlySelected && ($scope.selectionLimit === 0 || $scope.selectedOptions.length < $scope.selectionLimit)) {
-                        var unselectedIndex = $scope.unselectedOptions.indexOf(item);
-                        $scope.unselectedOptions.splice(unselectedIndex, 1);
-                        $scope.selectedOptions.push(item);
+                    } else if (!currentlySelected && ($scope.selectionLimit === 0 || $scope.selectedOptions.length < $scope.selectionLimit || $scope.selectionLimit == 1)) {
+                        // Rong add if selectionLimit == 1 is the user maybe need swap items
+                        if($scope.selectionLimit == 1){
+                          $scope.selectedOptions = [item];
+                        }else{
+                          var unselectedIndex = $scope.unselectedOptions.indexOf(item);
+                          $scope.unselectedOptions.splice(unselectedIndex, 1);
+                          $scope.selectedOptions.push(item);
+                        }
+
+                        // type only number, but not input string
+                        if(typeof($scope.selectionLimit) == 'number'){
+                          var _length = $scope.selectedOptions.length;
+                          if($scope.selectionLimit == _length){
+                            $scope.open = false;
+                            $scope.searchFilter = '';
+                            $scope.updateOptions();
+                          } // if
+                        } // if
                     }
                 };
 
@@ -214,6 +249,23 @@
                             updateSelectionLists();
                         });
                     }
+
+                    if($scope.fetchSearchFilterData && typeof($scope.fetchSearchFilterData) === 'function'){
+                      var returnData = { filterStr: $scope.searchFilter };
+                      var _unselectedOptions = $scope.unselectedOptions
+                      var count = 0;
+                      for(var idx in _unselectedOptions){
+                        if(_unselectedOptions[idx].name.toLowerCase().indexOf($scope.searchFilter.toLowerCase()) > -1){
+                          count++;
+                        } // if
+                        if(count > 0){
+                          returnData.isHaveSelectedData = true;
+                          break;
+                        } // if
+                      } // for
+                      $scope.fetchSearchFilterData(returnData);
+                    }
+
                 };
 
                 // This search function is optimized to take into account the search limit.
@@ -246,12 +298,14 @@ angular.module('btorfs.multiselect.templates', ['multiselect.html']);
 
 angular.module("multiselect.html", []).run(["$templateCache", function ($templateCache) {
   $templateCache.put("multiselect.html",
+    "<style>.bootstrap-multiselect-scrollable{ height: 25vw;max-height: 30vw;overflow-x: hidden;}</style>\n" +
     "<div class=\"btn-group\" style=\"width: 100%\">\n" +
     "    <button type=\"button\" class=\"btn dropdown-toggle\" ng-class=\"classesBtn\" ng-click=\"toggleDropdown()\" ng-disabled=\"disabled\" style=\"white-space: nowrap; overflow-x: hidden; text-overflow: ellipsis;\">\n" +
     "        {{getButtonText()}}&nbsp;<span class=\"caret\"></span>\n" +
     "    </button>\n" +
-    "    <ul class=\"dropdown-menu dropdown-menu-form\"\n" +
-    "        ng-style=\"{display: open ? 'block' : 'none'}\" style=\"width: 100%; overflow-x: auto\">\n" +
+    "    <ul class=\"dropdown-menu dropdown-menu-form\"\n" + "ng-class=\"{'bootstrap-multiselect-scrollable': options.length > 15}\"\n" +
+    // "        ng-style=\"{display: open ? 'block' : 'none'}\" style=\"width: 100%; overflow-x: auto\">\n" +
+    "        ng-style=\"{display: open ? 'block' : 'none'}\" style=\"overflow-x: auto\">\n" +
     "\n" +
     "        <li ng-show=\"showSelectAll\">\n" +
     "            <a ng-click=\"selectAll()\" href=\"\">\n" +
@@ -285,8 +339,8 @@ angular.module("multiselect.html", []).run(["$templateCache", function ($templat
     "        <li ng-show=\"showSearch\" class=\"divider\"></li>\n" +
     "        <li role=\"presentation\" ng-repeat=\"option in unselectedOptions | filter:search() | limitTo: searchLimit\"\n" +
     "            ng-if=\"!isSelected(option)\"\n" +
-    "            ng-class=\"{disabled : selectionLimit && selectedOptions.length >= selectionLimit}\">\n" +
-    "            <a class=\"item-unselected\" href=\"\" title=\"{{showTooltip ? getDisplay(option) : ''}}\" ng-click=\"toggleItem(option); $event.stopPropagation()\" style=\"overflow-x: hidden;text-overflow: ellipsis\">\n" +
+    "            ng-class=\"{disabled : selectionLimit && selectionLimit != 1 && selectedOptions.length >= selectionLimit}\">\n" +
+    "            <a class=\"item-unselected\" href=\"\" ng-class=\"{{option.customClass}}\" title=\"{{showTooltip ? getDisplay(option) : ''}}\" ng-click=\"toggleItem(option); $event.stopPropagation()\" style=\"overflow-x: hidden;text-overflow: ellipsis\">\n" +
     "                {{getDisplay(option)}}\n" +
     "            </a>\n" +
     "        </li>\n" +
