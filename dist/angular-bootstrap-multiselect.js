@@ -1,7 +1,14 @@
 (function () {
     'use strict';
 
-    var multiselect = angular.module('btorfs.multiselect', ['btorfs.multiselect.templates']);
+    var multiselect = angular.module('btorfs.multiselect', ['btorfs.multiselect.templates'])
+      .factory('directiveFocus', function ($rootScope, $timeout) {
+        return function(name) {
+          $timeout(function (){
+            $rootScope.$broadcast('focusOn', name);
+          });
+        }
+      })
 
     multiselect.getRecursiveProperty = function (object, path) {
         return path.split('.').reduce(function (object, x) {
@@ -13,7 +20,7 @@
         }, object)
     };
 
-    multiselect.directive('multiselect', ['$filter', '$document', '$log', function ($filter, $document, $log) {
+    multiselect.directive('multiselect', ['$filter', '$document', '$log', 'directiveFocus', function ($filter, $document, $log, directiveFocus) {
         return {
             restrict: 'AE',
             scope: {
@@ -45,6 +52,7 @@
                 $scope.searchLimit = $scope.searchLimit || 25;
 
                 $scope.searchFilter = '';
+                $scope.isFocusOn = $scope.showSearch == 1 || $scope.showSearch == true ? true:false;
 
                 $scope.resolvedOptions = [];
                 if (typeof $scope.options !== 'function') {
@@ -77,7 +85,30 @@
                         }
                         $scope.unselectedOptions = $scope.resolvedOptions.slice(); // Take a copy
                     } else {
-                        $scope.selectedOptions = $scope.resolvedOptions.filter(function (el) {
+                      /*
+                        2020-11-23 Rong modify, hope follow click seq display
+                        code 101 original code >> $scope.selectedOptions = $scope.resolvedOptions.filter(function (el) {
+                        and
+                        not have code 86~89, Rong add process same value
+                      */
+                      if(!$scope.selectedOptions && $ngModelCtrl.$viewValue.length > 0){
+                        $scope.selectedOptions = [];
+                        var tmpOptions = $ngModelCtrl.$viewValue.slice();  // Take a copy
+                        for(var i = 0; i < tmpOptions.length; i++){
+                          var id = tmpOptions[i].id;
+                          for(var j = 0; j < $scope.resolvedOptions.length; j++){
+                            var findId = $scope.resolvedOptions[j].id;
+                            if(id == findId){
+                              $scope.selectedOptions.push($scope.resolvedOptions[j]);
+                              break;
+                            } // if
+                          } // for
+                        } // for
+                      }else if(!$scope.selectedOptions){
+                        $scope.selectedOptions = [];
+                      } // if // if
+
+                      var tmpSelectedOptions = $scope.resolvedOptions.filter(function (el) {
                             var id = $scope.getId(el);
                             for (var i = 0; i < $ngModelCtrl.$viewValue.length; i++) {
                                 var selectedId = $scope.getId($ngModelCtrl.$viewValue[i]);
@@ -88,7 +119,8 @@
                             return false;
                         });
                         $scope.unselectedOptions = $scope.resolvedOptions.filter(function (el) {
-                            return $scope.selectedOptions.indexOf(el) < 0;
+                            // original => $scope.selectedOptions.indexOf(el)
+                            return tmpSelectedOptions.indexOf(el) < 0;
                         });
                     }
                 };
@@ -102,6 +134,10 @@
                     } // if
 
                     updateSelectionLists();
+
+                    if($scope.isFocusOn){
+                      directiveFocus('searchFilter')
+                    }
                 };
 
                 $ngModelCtrl.$render = function () {
@@ -130,7 +166,6 @@
                         watcher(); // Clean watcher
                     }
                 });
-
                 // Rong add process pre-fill data to display text content
                 function getReturnText(items){
                   var totalSelected = angular.isDefined(items) ? items.length : 0;
@@ -332,7 +367,7 @@ angular.module("multiselect.html", []).run(["$templateCache", function ($templat
     "        <li ng-show=\"showSearch\">\n" +
     "            <div class=\"dropdown-header\">\n" +
     "                <input type=\"text\" class=\"form-control input-sm\" style=\"width: 100%;\"\n" +
-    "                       ng-model=\"searchFilter\" placeholder=\"{{labels.search || 'Search...'}}\" ng-change=\"updateOptions()\"/>\n" +
+    "                       ng-model=\"searchFilter\" placeholder=\"{{labels.search || 'Search...'}}\" ng-change=\"updateOptions()\" focus-on=\"searchFilter\">\n" +
     "            </div>\n" +
     "        </li>\n" +
     "\n" +
