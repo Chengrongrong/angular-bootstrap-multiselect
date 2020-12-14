@@ -95,14 +95,20 @@
                         $scope.selectedOptions = [];
                         var tmpOptions = $ngModelCtrl.$viewValue.slice();  // Take a copy
                         for(var i = 0; i < tmpOptions.length; i++){
-                          var id = tmpOptions[i].id;
-                          for(var j = 0; j < $scope.resolvedOptions.length; j++){
-                            var findId = $scope.resolvedOptions[j].id;
-                            if(id == findId){
-                              $scope.selectedOptions.push($scope.resolvedOptions[j]);
-                              break;
-                            } // if
-                          } // for
+
+                          if(!tmpOptions[i]){
+                            continue;
+                          }else{
+                            var id = tmpOptions[i].id;
+                            for(var j = 0; j < $scope.resolvedOptions.length; j++){
+                              var findId = $scope.resolvedOptions[j].id;
+                              if(id == findId){
+                                $scope.selectedOptions.push($scope.resolvedOptions[j]);
+                                break;
+                              } // if
+                            } // for
+                          } // if
+
                         } // for
                       }else if(!$scope.selectedOptions){
                         $scope.selectedOptions = [];
@@ -290,7 +296,7 @@
                       var _unselectedOptions = $scope.unselectedOptions
                       var count = 0;
                       for(var idx in _unselectedOptions){
-                        if(_unselectedOptions[idx].name.toLowerCase().indexOf($scope.searchFilter.toLowerCase()) > -1){
+                        if(_unselectedOptions[idx].name && _unselectedOptions[idx].name.toLowerCase().indexOf($scope.searchFilter.toLowerCase()) > -1){
                           count++;
                         } // if
                         if(count > 0){
